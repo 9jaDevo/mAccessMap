@@ -5,6 +5,7 @@ import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
 import { ScrollToTop } from './components/ScrollToTop';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { DonateButton } from './components/DonateButton';
 import { HomePage } from './pages/HomePage';
 import { MapPage } from './pages/MapPage';
 import { ReviewPage } from './pages/ReviewPage';
@@ -60,6 +61,7 @@ function App() {
             </main>
             <Footer />
             <Toaster />
+            <DonateButton />
           </div>
         </GoogleMapsProvider>
       </AuthProvider>

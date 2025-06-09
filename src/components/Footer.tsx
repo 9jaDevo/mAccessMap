@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Heart, Github, Linkedin, Facebook, ExternalLink } from 'lucide-react';
+import { MapPin, Heart, Github, Linkedin, Facebook } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -120,7 +120,7 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Social Links & Newsletter */}
+        {/* Social Links */}
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
             {/* Social Links */}
@@ -154,22 +154,6 @@ export const Footer: React.FC = () => {
                 >
                   <Facebook className="w-5 h-5" />
                 </a>
-              </div>
-            </div>
-
-            {/* Newsletter Signup */}
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-400">Stay updated:</span>
-              <div className="flex">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-l-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-                <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-r-lg text-sm font-medium transition-colors flex items-center space-x-1">
-                  <span>Subscribe</span>
-                  <ExternalLink className="w-3 h-3" />
-                </button>
               </div>
             </div>
           </div>

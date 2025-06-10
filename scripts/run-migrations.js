@@ -11,8 +11,8 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config();
 
-const supabaseUrl = meta.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Missing required environment variables:');

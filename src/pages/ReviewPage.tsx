@@ -201,29 +201,6 @@ export const ReviewPage: React.FC = () => {
     }));
   };
 
-  const handleTestLocationInsert = async () => {
-    try {
-      console.log('Attempting to insert test location...');
-      const dummyLocation = {
-        name: 'Test Location ' + Date.now(),
-        address: '123 Test St, Test City, TC 12345',
-        category: 'other',
-        latitude: 0.0,
-        longitude: 0.0,
-      };
-      const result = await createLocation(dummyLocation);
-      console.log('Test location insert result:', result);
-      if (result) {
-        showToast('success', 'Test location inserted successfully!');
-      } else {
-        showToast('error', 'Test location insert failed (no result)');
-      }
-    } catch (error) {
-      console.error('Error during test location insert:', error);
-      showToast('error', 'Error inserting test location: ' + (error as Error).message);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -553,15 +530,6 @@ export const ReviewPage: React.FC = () => {
                 } text-white`}
               >
                 {isSubmitting ? 'Submitting Review...' : 'Submit Review'}
-              </button>
-              
-              {/* Test Button */}
-              <button
-                type="button"
-                onClick={handleTestLocationInsert}
-                className="mt-4 w-full py-3 px-4 rounded-lg font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors"
-              >
-                Test Location Insert
               </button>
             </div>
           </form>

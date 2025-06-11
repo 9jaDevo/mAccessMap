@@ -741,44 +741,59 @@ export const mintBadgeNFT = async (
       throw new Error('Transaction failed');
     }
     
-    // Extract token ID from the Transfer event
-    let tokenId: string | undefined;
+    // Extract token ID from events - prioritize BadgeMinted event
+let tokenId: string | undefined;
+
+console.log('NFT: Processing logs to find token ID...');
+console.log('NFT: Number of logs:', receipt.logs?.length || 0);
+
+if (receipt.logs) {
+  for (let i = 0; i < receipt.logs.length; i++) {
+    const log = receipt.logs[i];
+    console.log(`NFT: Processing log ${i + 1}:`, log);
     
-    console.log('NFT: Processing logs to find Transfer event...');
-    console.log('NFT: Number of logs:', receipt.logs?.length || 0);
-    
-    if (receipt.logs) {
-      for (let i = 0; i < receipt.logs.length; i++) {
-        const log = receipt.logs[i];
-        console.log(`NFT: Processing log ${i + 1}:`, log);
+    try {
+      const parsedLog = contract.interface.parseLog(log);
+      console.log(`NFT: Parsed log ${i + 1}:`, parsedLog);
+      
+      // PRIORITY 1: Check for BadgeMinted event first (our custom event)
+      if (parsedLog && parsedLog.name === 'BadgeMinted') {
+        console.log('NFT: Found BadgeMinted event!');
+        console.log('NFT: BadgeMinted event args:', parsedLog.args);
         
-        try {
-          const parsedLog = contract.interface.parseLog(log);
-          console.log(`NFT: Parsed log ${i + 1}:`, parsedLog);
-          
-          if (parsedLog && parsedLog.name === 'Transfer') {
-            console.log('NFT: Found Transfer event!');
-            console.log('NFT: Transfer event args:', parsedLog.args);
-            
-            if (parsedLog.args.tokenId) {
-              tokenId = parsedLog.args.tokenId.toString();
-              console.log('NFT: Extracted token ID:', tokenId);
-              break;
-            } else {
-              console.warn('NFT: Transfer event found but no tokenId in args');
-            }
-          } else {
-            console.log(`NFT: Log ${i + 1} is not a Transfer event:`, parsedLog?.name || 'unparseable');
-          }
-        } catch (parseError) {
-          console.log(`NFT: Could not parse log ${i + 1}:`, parseError);
-          // Skip logs that can't be parsed
-          continue;
+        if (parsedLog.args.tokenId !== undefined) {
+          tokenId = parsedLog.args.tokenId.toString();
+          console.log('NFT: Extracted token ID from BadgeMinted event:', tokenId);
+          break; // Found the token ID, exit the loop
+        } else {
+          console.warn('NFT: BadgeMinted event found but no tokenId in args');
         }
       }
-    } else {
-      console.warn('NFT: No logs found in transaction receipt');
+      // PRIORITY 2: Check for Transfer event as fallback (only if BadgeMinted not found)
+      else if (parsedLog && parsedLog.name === 'Transfer' && !tokenId) {
+        console.log('NFT: Found Transfer event (fallback)');
+        console.log('NFT: Transfer event args:', parsedLog.args);
+        
+        // Only use Transfer event if it's a mint (from zero address) and we haven't found BadgeMinted
+        if (parsedLog.args.from === '0x0000000000000000000000000000000000000000' && parsedLog.args.tokenId !== undefined) {
+          tokenId = parsedLog.args.tokenId.toString();
+          console.log('NFT: Extracted token ID from Transfer event (mint):', tokenId);
+          // Don't break here in case there's a BadgeMinted event later in the logs
+        } else {
+          console.log('NFT: Transfer event found but not a mint or no tokenId');
+        }
+      } else {
+        console.log(`NFT: Log ${i + 1} is not BadgeMinted or Transfer event:`, parsedLog?.name || 'unparseable');
+      }
+    } catch (parseError) {
+      console.log(`NFT: Could not parse log ${i + 1}:`, parseError);
+      // Skip logs that can't be parsed
+      continue;
     }
+  }
+} else {
+  console.warn('NFT: No logs found in transaction receipt');
+}
 
     if (!tokenId) {
       console.warn('NFT: Could not extract token ID from transaction logs');

@@ -1,9 +1,9 @@
-import { getUserProfile, createNFTBadge, getReviews } from './database';
+import { getUserProfile, createNFTBadge, getReviews, getUserBadges } from './database';
 import { generateBadgeMetadata, uploadMetadataToIPFS, BADGE_TYPES, type UserStats } from './ipfs';
 import { mintBadgeNFT } from './nft';
 import { showToast } from '../components/Toaster';
 
-// Check which badges a user is eligible for
+// Check which badges a user is eligible for based on review count
 export const checkBadgeEligibility = async (userId: string): Promise<string[]> => {
   try {
     const profile = await getUserProfile(userId);
@@ -22,6 +22,26 @@ export const checkBadgeEligibility = async (userId: string): Promise<string[]> =
     return eligibleBadges;
   } catch (error) {
     console.error('Error checking badge eligibility:', error);
+    return [];
+  }
+};
+
+// Get badges that are earned but not yet minted as NFTs
+export const getEarnedButNotMintedBadges = async (userId: string): Promise<string[]> => {
+  try {
+    const [eligibleBadges, mintedBadges] = await Promise.all([
+      checkBadgeEligibility(userId),
+      getUserBadges(userId)
+    ]);
+
+    // Filter out badges that have been successfully minted (have token_id)
+    const mintedBadgeTypes = mintedBadges
+      .filter(badge => badge.token_id && badge.token_id.trim() !== '')
+      .map(badge => badge.badge_type);
+
+    return eligibleBadges.filter(badgeType => !mintedBadgeTypes.includes(badgeType));
+  } catch (error) {
+    console.error('Error getting earned but not minted badges:', error);
     return [];
   }
 };
@@ -63,22 +83,23 @@ export const getUserStatsForBadge = async (userId: string): Promise<UserStats | 
   }
 };
 
-// Process automatic badge minting for a user
+// Process automatic badge minting for a user (only creates DB record if NFT is successfully minted)
 export const processAutomaticBadgeMinting = async (
   userId: string, 
   walletAddress?: string
-): Promise<{ success: boolean; badgesMinted: string[]; errors: string[] }> => {
+): Promise<{ success: boolean; badgesMinted: string[]; badgesEarned: string[]; errors: string[] }> => {
   const result = {
     success: true,
-    badgesMinted: [] as string[],
+    badgesMinted: [] as string[], // Actually minted as NFTs
+    badgesEarned: [] as string[], // Earned but not minted (no wallet or minting failed)
     errors: [] as string[],
   };
 
   try {
-    // Check which badges the user is eligible for
-    const eligibleBadges = await checkBadgeEligibility(userId);
+    // Get badges that are earned but not yet minted
+    const earnedButNotMinted = await getEarnedButNotMintedBadges(userId);
     
-    if (eligibleBadges.length === 0) {
+    if (earnedButNotMinted.length === 0) {
       return result;
     }
 
@@ -90,17 +111,9 @@ export const processAutomaticBadgeMinting = async (
       return result;
     }
 
-    // Process each eligible badge
-    for (const badgeType of eligibleBadges) {
+    // Process each earned badge
+    for (const badgeType of earnedButNotMinted) {
       try {
-        // Check if user already has this badge
-        const existingBadges = await getUserBadges(userId);
-        const hasThisBadge = existingBadges.some(badge => badge.badge_type === badgeType);
-        
-        if (hasThisBadge) {
-          continue; // Skip if already earned
-        }
-
         // Generate metadata
         const metadata = generateBadgeMetadata(badgeType as keyof typeof BADGE_TYPES, userStats);
         
@@ -110,38 +123,39 @@ export const processAutomaticBadgeMinting = async (
         let tokenId: string | undefined;
         let transactionHash: string | undefined;
         
-        // Mint NFT if wallet is connected
+        // Only attempt to mint NFT if wallet is connected
         if (walletAddress) {
           try {
             const mintResult = await mintBadgeNFT(walletAddress, metadataUri);
-            if (mintResult) {
+            if (mintResult && mintResult.tokenId && mintResult.transactionHash) {
               tokenId = mintResult.tokenId;
               transactionHash = mintResult.transactionHash;
+              
+              // Only save to database if NFT was successfully minted
+              await createNFTBadge({
+                user_id: userId,
+                badge_type: badgeType,
+                token_id: tokenId,
+                contract_address: import.meta.env.VITE_CONTRACT_ADDRESS || '',
+                metadata_uri: metadataUri,
+                transaction_hash: transactionHash,
+              });
+
+              result.badgesMinted.push(badgeType);
+              showToast('success', `🎉 ${badgeType} NFT badge minted successfully!`);
+            } else {
+              // Minting failed, but badge is still earned
+              result.badgesEarned.push(badgeType);
+              result.errors.push(`Failed to mint NFT for ${badgeType}, but badge is earned`);
             }
           } catch (mintError) {
             console.error(`Error minting NFT for badge ${badgeType}:`, mintError);
             result.errors.push(`Failed to mint NFT for ${badgeType}: ${mintError}`);
-            // Continue to save badge record even if minting fails
+            result.badgesEarned.push(badgeType);
           }
-        }
-
-        // Save badge record to database
-        await createNFTBadge({
-          user_id: userId,
-          badge_type: badgeType,
-          token_id: tokenId || '',
-          contract_address: import.meta.env.VITE_CONTRACT_ADDRESS || '',
-          metadata_uri: metadataUri,
-          transaction_hash: transactionHash || '',
-        });
-
-        result.badgesMinted.push(badgeType);
-        
-        // Show success notification
-        if (walletAddress && tokenId) {
-          showToast('success', `🎉 ${badgeType} NFT badge minted successfully!`);
         } else {
-          showToast('success', `🎉 ${badgeType} badge earned! Connect wallet to mint NFT.`);
+          // No wallet connected, badge is earned but not minted
+          result.badgesEarned.push(badgeType);
         }
         
       } catch (badgeError) {
@@ -149,6 +163,15 @@ export const processAutomaticBadgeMinting = async (
         result.errors.push(`Failed to process ${badgeType}: ${badgeError}`);
         result.success = false;
       }
+    }
+
+    // Show appropriate notifications
+    if (result.badgesMinted.length > 0) {
+      showToast('success', `🎉 ${result.badgesMinted.length} NFT badge${result.badgesMinted.length > 1 ? 's' : ''} minted!`);
+    }
+    
+    if (result.badgesEarned.length > 0 && !walletAddress) {
+      showToast('info', `🏆 You've earned ${result.badgesEarned.length} new badge${result.badgesEarned.length > 1 ? 's' : ''}! Connect your wallet to mint NFTs.`);
     }
 
   } catch (error) {
@@ -165,8 +188,9 @@ export const triggerBadgeCheckAfterReview = async (userId: string, walletAddress
   try {
     const result = await processAutomaticBadgeMinting(userId, walletAddress);
     
-    if (result.badgesMinted.length > 0) {
-      showToast('success', `Congratulations! You've earned ${result.badgesMinted.length} new badge${result.badgesMinted.length > 1 ? 's' : ''}!`);
+    if (result.badgesMinted.length > 0 || result.badgesEarned.length > 0) {
+      const totalNew = result.badgesMinted.length + result.badgesEarned.length;
+      showToast('success', `Congratulations! You've earned ${totalNew} new badge${totalNew > 1 ? 's' : ''}!`);
     }
     
     if (result.errors.length > 0) {
@@ -176,12 +200,9 @@ export const triggerBadgeCheckAfterReview = async (userId: string, walletAddress
     return result;
   } catch (error) {
     console.error('Error triggering badge check:', error);
-    return { success: false, badgesMinted: [], errors: [String(error)] };
+    return { success: false, badgesMinted: [], badgesEarned: [], errors: [String(error)] };
   }
 };
-
-// Get user's badges (import from database)
-import { getUserBadges } from './database';
 
 // Manual badge claim function (for UI)
 export const claimBadgeManually = async (
@@ -191,26 +212,46 @@ export const claimBadgeManually = async (
 ): Promise<boolean> => {
   try {
     // Check if user is eligible for this specific badge
-    const eligibleBadges = await checkBadgeEligibility(userId);
+    const earnedButNotMinted = await getEarnedButNotMintedBadges(userId);
     
-    if (!eligibleBadges.includes(badgeType)) {
-      showToast('error', 'You are not eligible for this badge yet');
+    if (!earnedButNotMinted.includes(badgeType)) {
+      showToast('error', 'You are not eligible for this badge or it has already been minted');
       return false;
     }
 
-    // Check if user already has this badge
-    const existingBadges = await getUserBadges(userId);
-    const hasThisBadge = existingBadges.some(badge => badge.badge_type === badgeType);
-    
-    if (hasThisBadge) {
-      showToast('info', 'You have already earned this badge');
+    // Get user stats for metadata
+    const userStats = await getUserStatsForBadge(userId);
+    if (!userStats) {
+      showToast('error', 'Unable to fetch user statistics');
       return false;
     }
 
-    // Process the specific badge
-    const result = await processAutomaticBadgeMinting(userId, walletAddress);
+    // Generate metadata
+    const metadata = generateBadgeMetadata(badgeType as keyof typeof BADGE_TYPES, userStats);
     
-    return result.success && result.badgesMinted.includes(badgeType);
+    // Upload metadata to IPFS
+    const metadataUri = await uploadMetadataToIPFS(metadata);
+    
+    // Mint the NFT
+    const mintResult = await mintBadgeNFT(walletAddress, metadataUri);
+    
+    if (mintResult && mintResult.tokenId && mintResult.transactionHash) {
+      // Save to database only if minting was successful
+      await createNFTBadge({
+        user_id: userId,
+        badge_type: badgeType,
+        token_id: mintResult.tokenId,
+        contract_address: import.meta.env.VITE_CONTRACT_ADDRESS || '',
+        metadata_uri: metadataUri,
+        transaction_hash: mintResult.transactionHash,
+      });
+
+      showToast('success', `🎉 ${badgeType} NFT badge minted successfully!`);
+      return true;
+    } else {
+      showToast('error', 'Failed to mint NFT badge');
+      return false;
+    }
   } catch (error) {
     console.error('Error claiming badge manually:', error);
     showToast('error', 'Failed to claim badge');

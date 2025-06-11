@@ -4,7 +4,7 @@ import { Award, Users, Star, Shield, Heart, Trophy, Crown, Zap, LogIn, Wallet } 
 import { useAuth } from '../contexts/AuthContext';
 import { useUserProfile, useUserBadges } from '../hooks/useDatabase';
 import { useWallet } from '../hooks/useWallet';
-import { claimBadgeManually, getNextBadgeToEarn } from '../lib/badgeSystem';
+import { claimBadgeManually, getNextBadgeToEarn, checkBadgeEligibility } from '../lib/badgeSystem';
 import { BADGE_TYPES } from '../lib/ipfs';
 import { showToast } from '../components/Toaster';
 
@@ -19,6 +19,7 @@ interface Badge {
   holders: number;
   metadata_uri: string;
   minted?: boolean;
+  earned?: boolean;
   unlockedAt?: string;
 }
 
@@ -34,6 +35,7 @@ const mockBadges: Badge[] = [
     holders: 3821,
     metadata_uri: 'ipfs://QmFirstStepsBadgeMetadata',
     minted: false,
+    earned: false,
   },
   {
     id: '2',
@@ -46,6 +48,7 @@ const mockBadges: Badge[] = [
     holders: 1943,
     metadata_uri: 'ipfs://QmCommunityBuilderBadgeMetadata',
     minted: false,
+    earned: false,
   },
   {
     id: '3',
@@ -58,6 +61,7 @@ const mockBadges: Badge[] = [
     holders: 452,
     metadata_uri: 'ipfs://QmAccessibilityAdvocateBadgeMetadata',
     minted: false,
+    earned: false,
   },
   {
     id: '4',
@@ -70,6 +74,7 @@ const mockBadges: Badge[] = [
     holders: 128,
     metadata_uri: 'ipfs://QmGuardianOfAccessBadgeMetadata',
     minted: false,
+    earned: false,
   },
   {
     id: '5',
@@ -82,6 +87,7 @@ const mockBadges: Badge[] = [
     holders: 43,
     metadata_uri: 'ipfs://QmInclusionChampionBadgeMetadata',
     minted: false,
+    earned: false,
   },
   {
     id: '6',
@@ -94,6 +100,7 @@ const mockBadges: Badge[] = [
     holders: 7,
     metadata_uri: 'ipfs://QmAccessibilityLegendBadgeMetadata',
     minted: false,
+    earned: false,
   },
 ];
 
@@ -120,11 +127,18 @@ export const BadgesPage: React.FC = () => {
   const [rarityFilter, setRarityFilter] = useState<'all' | Badge['rarity']>('all');
   const [claimingBadges, setClaimingBadges] = useState<Set<string>>(new Set());
   const [nextBadge, setNextBadge] = useState<{ badgeType: string; reviewsNeeded: number } | null>(null);
+  const [eligibleBadges, setEligibleBadges] = useState<string[]>([]);
 
-  // Fetch next badge information
+  // Fetch next badge information and eligible badges
   React.useEffect(() => {
     if (user) {
-      getNextBadgeToEarn(user.id).then(setNextBadge);
+      Promise.all([
+        getNextBadgeToEarn(user.id),
+        checkBadgeEligibility(user.id)
+      ]).then(([nextBadgeData, eligibleBadgeData]) => {
+        setNextBadge(nextBadgeData);
+        setEligibleBadges(eligibleBadgeData);
+      });
     }
   }, [user, profile]);
 
@@ -267,26 +281,30 @@ export const BadgesPage: React.FC = () => {
   // Use actual user review count from profile
   const userReviews = profile?.total_reviews || 0;
 
-  // Update badges with minted status from Supabase
-  const badgesWithMintedStatus = mockBadges.map(badge => {
+  // Update badges with earned and minted status
+  const badgesWithStatus = mockBadges.map(badge => {
+    const isEarned = eligibleBadges.includes(badge.name);
     const mintedBadge = badges.find(b => b.badge_type === badge.name);
+    const isMinted = mintedBadge && mintedBadge.token_id && mintedBadge.token_id.trim() !== '';
+    
     return {
       ...badge,
-      minted: !!mintedBadge,
+      earned: isEarned,
+      minted: !!isMinted,
     };
   });
 
-  const filteredBadges = badgesWithMintedStatus.filter(badge => {
-    const isUnlocked = userReviews >= badge.reviewsRequired;
+  const filteredBadges = badgesWithStatus.filter(badge => {
     const matchesFilter = filter === 'all' || 
-                         (filter === 'unlocked' && isUnlocked) || 
-                         (filter === 'locked' && !isUnlocked);
+                         (filter === 'unlocked' && badge.earned) || 
+                         (filter === 'locked' && !badge.earned);
     const matchesRarity = rarityFilter === 'all' || badge.rarity === rarityFilter;
     
     return matchesFilter && matchesRarity;
   });
 
-  const unlockedCount = badgesWithMintedStatus.filter(badge => userReviews >= badge.reviewsRequired).length;
+  const unlockedCount = badgesWithStatus.filter(badge => badge.earned).length;
+  const mintedCount = badgesWithStatus.filter(badge => badge.minted).length;
 
   const handleClaimBadge = async (badge: Badge) => {
     if (!isConnected) {
@@ -296,6 +314,16 @@ export const BadgesPage: React.FC = () => {
 
     if (!walletAddress) {
       showToast('error', 'Wallet address not found');
+      return;
+    }
+
+    if (!badge.earned) {
+      showToast('error', 'You have not earned this badge yet');
+      return;
+    }
+
+    if (badge.minted) {
+      showToast('info', 'This badge has already been minted as an NFT');
       return;
     }
 
@@ -338,10 +366,20 @@ export const BadgesPage: React.FC = () => {
           </p>
           
           <div className="bg-white rounded-xl p-6 max-w-md mx-auto shadow-sm border">
-            <div className="text-2xl font-bold text-emerald-600 mb-1">
-              {unlockedCount} / {mockBadges.length}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <div className="text-2xl font-bold text-emerald-600 mb-1">
+                  {unlockedCount}
+                </div>
+                <div className="text-gray-600 text-sm">Badges Earned</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-purple-600 mb-1">
+                  {mintedCount}
+                </div>
+                <div className="text-gray-600 text-sm">NFTs Minted</div>
+              </div>
             </div>
-            <div className="text-gray-600">Badges Unlocked</div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
               <div 
                 className="bg-gradient-to-r from-emerald-500 to-blue-600 h-2 rounded-full transition-all duration-300"
@@ -429,7 +467,7 @@ export const BadgesPage: React.FC = () => {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                Unlocked ({unlockedCount})
+                Earned ({unlockedCount})
               </button>
               <button
                 onClick={() => setFilter('locked')}
@@ -461,14 +499,13 @@ export const BadgesPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBadges.map((badge) => {
             const Icon = badge.icon;
-            const isUnlocked = userReviews >= badge.reviewsRequired;
             const isClaiming = claimingBadges.has(badge.id);
             
             return (
               <div
                 key={badge.id}
                 className={`bg-white rounded-xl p-6 shadow-sm border-2 transition-all duration-200 hover:shadow-md ${
-                  isUnlocked 
+                  badge.earned 
                     ? `${rarityColors[badge.rarity]} hover:scale-105` 
                     : 'border-gray-200 opacity-60'
                 }`}
@@ -476,7 +513,7 @@ export const BadgesPage: React.FC = () => {
                 {/* Badge Icon */}
                 <div className="relative mb-4">
                   <div className={`w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br ${badge.gradient} flex items-center justify-center ${
-                    !isUnlocked ? 'grayscale' : ''
+                    !badge.earned ? 'grayscale' : ''
                   }`}>
                     <Icon className="w-10 h-10 text-white" />
                   </div>
@@ -491,7 +528,7 @@ export const BadgesPage: React.FC = () => {
                     <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                       <Zap className="w-3 h-3 text-white" />
                     </div>
-                  ) : isUnlocked ? (
+                  ) : badge.earned ? (
                     <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                       <Award className="w-3 h-3 text-white" />
                     </div>
@@ -529,10 +566,10 @@ export const BadgesPage: React.FC = () => {
                     {badge.minted ? (
                       <div className="text-sm">
                         <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                          ✓ NFT Claimed!
+                          ✓ NFT Minted!
                         </span>
                       </div>
-                    ) : isUnlocked ? (
+                    ) : badge.earned ? (
                       <div className="mt-4">
                         <button
                           onClick={() => handleClaimBadge(badge)}
@@ -548,14 +585,17 @@ export const BadgesPage: React.FC = () => {
                           {isClaiming ? (
                             <div className="flex items-center justify-center space-x-2">
                               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Claiming...</span>
+                              <span>Minting...</span>
                             </div>
                           ) : !isConnected ? (
-                            'Connect Wallet to Claim'
+                            'Connect Wallet to Mint NFT'
                           ) : (
-                            'Claim NFT Badge'
+                            'Mint NFT Badge'
                           )}
                         </button>
+                        <div className="text-xs text-blue-600 mt-1">
+                          Badge earned! Ready to mint as NFT
+                        </div>
                       </div>
                     ) : (
                       <div className="text-sm">
@@ -569,7 +609,7 @@ export const BadgesPage: React.FC = () => {
                 </div>
 
                 {/* Progress Bar for Locked Badges */}
-                {!isUnlocked && (
+                {!badge.earned && (
                   <div className="mt-4">
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
@@ -604,7 +644,7 @@ export const BadgesPage: React.FC = () => {
           <p className="text-emerald-100 mb-6 max-w-2xl mx-auto">
             {unlockedCount === 0 
               ? 'Submit your first accessibility review and begin your journey toward earning unique NFT badges that showcase your commitment to inclusion.'
-              : `You've unlocked ${unlockedCount} badge${unlockedCount !== 1 ? 's' : ''}! Continue contributing to earn more recognition for your accessibility advocacy.`
+              : `You've earned ${unlockedCount} badge${unlockedCount !== 1 ? 's' : ''}! Continue contributing to earn more recognition for your accessibility advocacy.`
             }
           </p>
           <Link

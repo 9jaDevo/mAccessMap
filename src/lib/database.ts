@@ -170,26 +170,6 @@ export const createLocation = async (location: Omit<Location, 'id' | 'created_at
   console.log('createLocation: Function called with data:', location);
   
   try {
-    console.log('createLocation: Starting external API fetch test');
-    
-    // EXTERNAL API FETCH TEST: Test external network connectivity
-    console.log('createLocation: About to fetch from https://jsonplaceholder.typicode.com/todos/1');
-    const fetchStartTime = Date.now();
-    
-    const externalResponse = await fetch('https://jsonplaceholder.typicode.com/todos/1');
-    const fetchEndTime = Date.now();
-    
-    console.log('createLocation: External fetch completed in', fetchEndTime - fetchStartTime, 'ms');
-    console.log('createLocation: External fetch status:', externalResponse.status, externalResponse.statusText);
-    
-    if (externalResponse.ok) {
-      const externalData = await externalResponse.json();
-      console.log('createLocation: External API response data:', externalData);
-      console.log('createLocation: ✅ External network request successful - application can make external API calls');
-    } else {
-      console.log('createLocation: ❌ External fetch failed with status:', externalResponse.status);
-    }
-    
     console.log('createLocation: Starting fetch before insert logic');
     
     // FETCH BEFORE INSERT: Check if location already exists

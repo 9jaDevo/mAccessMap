@@ -33,6 +33,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [initialSessionProcessed, setInitialSessionProcessed] = useState(false);
   const navigate = useNavigate();
 
   // Memoize the clearAuthState function
@@ -138,8 +139,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('AuthContext: Unexpected error during initialization:', error);
         clearAuthState();
       } finally {
-        console.log('AuthContext: Setting loading to false');
+        console.log('AuthContext: Setting loading to false and marking initial session as processed');
         setLoading(false);
+        setInitialSessionProcessed(true);
       }
     };
 
@@ -153,6 +155,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('AuthContext: Auth state changed:', event, session?.user?.id || 'no user');
+        
+        // Skip INITIAL_SESSION events after the first one to prevent loops
+        if (event === 'INITIAL_SESSION') {
+          if (initialSessionProcessed) {
+            console.log('AuthContext: Skipping duplicate INITIAL_SESSION event');
+            return;
+          }
+          console.log('AuthContext: Processing first INITIAL_SESSION event');
+          setInitialSessionProcessed(true);
+        }
         
         try {
           // Handle different auth events
@@ -207,6 +219,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
               break;
               
+            case 'INITIAL_SESSION':
+              console.log('AuthContext: Initial session event');
+              // This is handled in the initialization effect above
+              // We don't need to do anything here to prevent duplicate processing
+              break;
+              
             default:
               console.log('AuthContext: Unhandled auth event:', event);
           }
@@ -223,7 +241,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: Cleaning up auth state change listener');
       subscription.unsubscribe();
     };
-  }, [clearAuthState, checkUserProfile, navigate]);
+  }, [clearAuthState, checkUserProfile, navigate, initialSessionProcessed]);
 
   // Memoize the signUp function
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
@@ -308,7 +326,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasSession: !!session,
     loading,
     isAdmin,
-    userId: user?.id
+    userId: user?.id,
+    initialSessionProcessed
   });
 
   return (

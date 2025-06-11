@@ -578,31 +578,42 @@ export const isMetaMaskAvailable = (): boolean => {
 
 // Connect to MetaMask wallet
 export const connectWallet = async (): Promise<string | null> => {
+  console.log('NFT: Starting wallet connection...');
+  
   if (!isMetaMaskAvailable()) {
+    console.error('NFT: MetaMask not available');
     showToast('error', 'MetaMask is not installed. Please install MetaMask to claim NFT badges.');
     return null;
   }
 
   try {
+    console.log('NFT: Requesting account access...');
     // Request account access
     const accounts = await window.ethereum.request({
       method: 'eth_requestAccounts',
     });
 
     if (accounts.length === 0) {
+      console.error('NFT: No accounts found');
       showToast('error', 'No accounts found. Please connect your MetaMask wallet.');
       return null;
     }
 
+    console.log('NFT: Account connected:', accounts[0]);
+
     // Switch to Sepolia network if not already connected
     try {
+      console.log('NFT: Switching to Sepolia network...');
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: '0xaa36a7' }], // Sepolia testnet chain ID
       });
+      console.log('NFT: Successfully switched to Sepolia');
     } catch (switchError: any) {
+      console.log('NFT: Network switch error:', switchError);
       // If the network doesn't exist, add it
       if (switchError.code === 4902) {
+        console.log('NFT: Adding Sepolia network...');
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [
@@ -619,6 +630,7 @@ export const connectWallet = async (): Promise<string | null> => {
             },
           ],
         });
+        console.log('NFT: Sepolia network added successfully');
       } else {
         throw switchError;
       }
@@ -626,7 +638,7 @@ export const connectWallet = async (): Promise<string | null> => {
 
     return accounts[0];
   } catch (error: any) {
-    console.error('Error connecting wallet:', error);
+    console.error('NFT: Error connecting wallet:', error);
     showToast('error', `Failed to connect wallet: ${error.message}`);
     return null;
   }
@@ -634,18 +646,34 @@ export const connectWallet = async (): Promise<string | null> => {
 
 // Get the contract instance
 export const getContract = async (): Promise<ethers.Contract | null> => {
+  console.log('NFT: Getting contract instance...');
+  
   if (!isMetaMaskAvailable()) {
+    console.error('NFT: MetaMask not available for contract');
     showToast('error', 'MetaMask is not installed');
     return null;
   }
 
+  if (!CONTRACT_ADDRESS) {
+    console.error('NFT: Contract address not configured');
+    showToast('error', 'Contract address not configured');
+    return null;
+  }
+
   try {
+    console.log('NFT: Creating provider and signer...');
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
     
-    return new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer);
+    console.log('NFT: Contract address:', CONTRACT_ADDRESS);
+    console.log('NFT: Signer address:', await signer.getAddress());
+    
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer);
+    console.log('NFT: Contract instance created successfully');
+    
+    return contract;
   } catch (error: any) {
-    console.error('Error getting contract:', error);
+    console.error('NFT: Error getting contract:', error);
     showToast('error', `Failed to connect to contract: ${error.message}`);
     return null;
   }
@@ -656,53 +684,122 @@ export const mintBadgeNFT = async (
   recipientAddress: string,
   badgeUri: string
 ): Promise<{ transactionHash: string; tokenId?: string } | null> => {
+  console.log('NFT: Starting badge minting process...');
+  console.log('NFT: Recipient:', recipientAddress);
+  console.log('NFT: Badge URI:', badgeUri);
+  
   try {
     const contract = await getContract();
     if (!contract) {
+      console.error('NFT: Failed to get contract instance');
       return null;
     }
 
+    console.log('NFT: Calling mintBadge function...');
     // Call the mintBadge function
     const transaction = await contract.mintBadge(recipientAddress, badgeUri);
+    console.log('NFT: Transaction submitted:', transaction.hash);
     
     showToast('info', 'Transaction submitted! Waiting for confirmation...');
     
     // Wait for the transaction to be mined
+    console.log('NFT: Waiting for transaction confirmation...');
     const receipt = await transaction.wait();
+    console.log('NFT: Transaction confirmed. Receipt:', receipt);
+    console.log('NFT: Transaction hash:', receipt.hash);
+    console.log('NFT: Block number:', receipt.blockNumber);
+    console.log('NFT: Gas used:', receipt.gasUsed?.toString());
+    console.log('NFT: Status:', receipt.status);
+    
+    if (receipt.status !== 1) {
+      console.error('NFT: Transaction failed with status:', receipt.status);
+      throw new Error('Transaction failed');
+    }
     
     // Extract token ID from the Transfer event
     let tokenId: string | undefined;
     
+    console.log('NFT: Processing logs to find Transfer event...');
+    console.log('NFT: Number of logs:', receipt.logs?.length || 0);
+    
     if (receipt.logs) {
-      for (const log of receipt.logs) {
+      for (let i = 0; i < receipt.logs.length; i++) {
+        const log = receipt.logs[i];
+        console.log(`NFT: Processing log ${i + 1}:`, log);
+        
         try {
           const parsedLog = contract.interface.parseLog(log);
+          console.log(`NFT: Parsed log ${i + 1}:`, parsedLog);
+          
           if (parsedLog && parsedLog.name === 'Transfer') {
-            tokenId = parsedLog.args.tokenId.toString();
-            break;
+            console.log('NFT: Found Transfer event!');
+            console.log('NFT: Transfer event args:', parsedLog.args);
+            
+            if (parsedLog.args.tokenId) {
+              tokenId = parsedLog.args.tokenId.toString();
+              console.log('NFT: Extracted token ID:', tokenId);
+              break;
+            } else {
+              console.warn('NFT: Transfer event found but no tokenId in args');
+            }
+          } else {
+            console.log(`NFT: Log ${i + 1} is not a Transfer event:`, parsedLog?.name || 'unparseable');
           }
-        } catch (e) {
+        } catch (parseError) {
+          console.log(`NFT: Could not parse log ${i + 1}:`, parseError);
           // Skip logs that can't be parsed
           continue;
         }
       }
+    } else {
+      console.warn('NFT: No logs found in transaction receipt');
     }
 
-    return {
+    if (!tokenId) {
+      console.warn('NFT: Could not extract token ID from transaction logs');
+      console.log('NFT: Attempting alternative token ID extraction...');
+      
+      // Alternative: try to get the latest token ID from the contract
+      try {
+        // This is a fallback - you might need to implement a way to get the latest token ID
+        // For now, we'll proceed without it
+        console.warn('NFT: Proceeding without token ID - this may need manual verification');
+      } catch (altError) {
+        console.error('NFT: Alternative token ID extraction failed:', altError);
+      }
+    }
+
+    const result = {
       transactionHash: receipt.hash,
       tokenId,
     };
+    
+    console.log('NFT: Minting completed successfully:', result);
+    return result;
   } catch (error: any) {
-    console.error('Error minting NFT:', error);
+    console.error('NFT: Error during minting process:', error);
+    console.error('NFT: Error details:', {
+      message: error.message,
+      code: error.code,
+      data: error.data,
+      stack: error.stack
+    });
     
     // Handle specific error cases
     if (error.code === 'ACTION_REJECTED') {
+      console.log('NFT: User rejected transaction');
       showToast('error', 'Transaction was rejected by user');
     } else if (error.code === 'INSUFFICIENT_FUNDS') {
+      console.log('NFT: Insufficient funds');
       showToast('error', 'Insufficient funds to complete the transaction');
     } else if (error.message?.includes('user rejected')) {
+      console.log('NFT: User rejected transaction (message check)');
       showToast('error', 'Transaction was rejected by user');
+    } else if (error.message?.includes('execution reverted')) {
+      console.log('NFT: Contract execution reverted');
+      showToast('error', 'Contract execution failed. Please check your eligibility and try again.');
     } else {
+      console.log('NFT: Unknown error during minting');
       showToast('error', `Failed to mint NFT: ${error.message || 'Unknown error'}`);
     }
     

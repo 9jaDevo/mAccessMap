@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getUserProfile } from '../lib/database';
@@ -35,16 +35,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
-  // Clear all authentication state
-  const clearAuthState = () => {
+  // Memoize the clearAuthState function
+  const clearAuthState = useCallback(() => {
     console.log('AuthContext: Clearing authentication state');
     setSession(null);
     setUser(null);
     setIsAdmin(false);
-  };
+  }, []);
 
-  // Check user profile and admin status
-  const checkUserProfile = async (currentUser: User): Promise<boolean> => {
+  // Memoize the checkUserProfile function
+  const checkUserProfile = useCallback(async (currentUser: User): Promise<boolean> => {
     console.log('AuthContext: Checking user profile for:', currentUser.id);
     
     try {
@@ -81,10 +81,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAdmin(false);
       return true;
     }
-  };
+  }, []);
 
-  // Handle sign out with proper cleanup
-  const handleSignOut = async () => {
+  // Memoize the handleSignOut function
+  const handleSignOut = useCallback(async () => {
     console.log('AuthContext: Starting sign out process');
     
     try {
@@ -102,7 +102,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: Redirecting to auth page');
       navigate('/auth');
     }
-  };
+  }, [clearAuthState, navigate]);
 
   // Initialize authentication state
   useEffect(() => {
@@ -144,7 +144,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initializeAuth();
-  }, []);
+  }, [clearAuthState, checkUserProfile]);
 
   // Listen for authentication state changes
   useEffect(() => {
@@ -223,9 +223,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: Cleaning up auth state change listener');
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [clearAuthState, checkUserProfile, navigate]);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  // Memoize the signUp function
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     console.log('AuthContext: Starting sign up for:', email);
     setLoading(true);
     
@@ -252,9 +253,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  // Memoize the signIn function
+  const signIn = useCallback(async (email: string, password: string) => {
     console.log('AuthContext: Starting sign in for:', email);
     setLoading(true);
     
@@ -276,9 +278,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  // Memoize the signOut function
+  const signOut = useCallback(async () => {
     console.log('AuthContext: Sign out requested');
     setLoading(true);
     
@@ -287,9 +290,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleSignOut]);
 
-  const value = {
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     user,
     session,
     loading,
@@ -297,7 +301,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUp,
     signIn,
     signOut,
-  };
+  }), [user, session, loading, isAdmin, signUp, signIn, signOut]);
 
   console.log('AuthContext: Rendering with state:', {
     hasUser: !!user,

@@ -2,6 +2,8 @@
 
 A community-driven accessibility mapping platform that empowers users to catalog and rate the accessibility of public spaces while earning blockchain-based NFT badges for their contributions.
 
+🌐 **Live Demo:** [https://creative-strudel-f01ad0.netlify.app](https://creative-strudel-f01ad0.netlify.app)
+
 ## 🌟 Overview
 
 mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive world by crowdsourcing accessibility information about public spaces. Users can submit detailed reviews about accessibility features, earn reputation points, and receive unique NFT badges that recognize their civic contributions.
@@ -9,34 +11,39 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
 ## ✨ Features
 
 ### 🗺️ Interactive Map Explorer
-- **Real-time Location Discovery**: Browse accessibility-rated locations on an interactive map
+- **Real-time Location Discovery**: Browse accessibility-rated locations on an interactive map powered by Google Maps
 - **Smart Color Coding**: Visual indicators for accessibility scores (green=excellent, yellow=moderate, red=poor)
 - **Advanced Search & Filtering**: Find locations by category, accessibility features, or rating
-- **Detailed Location Profiles**: Comprehensive accessibility information for each venue
+- **Mobile-Responsive Design**: Seamless experience across desktop and mobile devices with toggle views
+- **Location Centering**: Automatically centers map on selected locations for better navigation
 
 ### 📝 Review Submission System
-- **Photo Upload**: Capture and upload images of accessibility features
+- **Photo Upload**: Capture and upload images of accessibility features with Supabase storage
 - **Comprehensive Checklists**: Rate wheelchair accessibility, audio cues, visual aids, and more
 - **Detailed Comments**: Share specific experiences and recommendations
-- **Verification System**: Community-moderated review verification process
+- **Google Places Integration**: Auto-complete addresses with location coordinates
+- **Current Location Detection**: Use GPS to automatically detect your location
 
 ### 🏆 NFT Badge System
-- **Blockchain Recognition**: Earn unique NFT badges on Polygon network for verified contributions
+- **Blockchain Recognition**: Earn unique NFT badges on Sepolia testnet for verified contributions
 - **Progressive Achievements**: Unlock badges at 1, 5, 25, 50, 100, and 250+ verified reviews
-- **Permanent Records**: Immutable proof of your accessibility advocacy
-- **Metadata Rich**: Each badge contains contributor stats and achievement details
+- **Automatic Minting**: Badges are automatically minted to your connected MetaMask wallet
+- **IPFS Metadata**: Rich metadata stored on IPFS with contributor stats and achievement details
+- **Smart Contract Integration**: Custom ERC-721 contract for badge minting
 
 ### 👥 Community Features
 - **User Profiles**: Track your contributions, badges, and impact statistics
-- **Global Leaderboards**: See top contributors by region and time period
-- **Badge Gallery**: Showcase your earned achievements
-- **Social Sharing**: Share your impact and encourage others to contribute
+- **Global Leaderboards**: See top contributors by reputation, reviews, and badges earned
+- **Badge Gallery**: Showcase your earned achievements with filtering options
+- **Admin Panel**: Comprehensive admin interface for managing reviews, users, and platform settings
+- **Review Management**: Edit, delete, and verify your own reviews
 
 ### 📱 Progressive Web App
 - **Offline Functionality**: Browse cached locations and submit reviews offline
 - **Install Anywhere**: Add to home screen on any device
 - **Push Notifications**: Get notified about badge achievements and community updates
 - **Background Sync**: Automatically sync offline contributions when connection returns
+- **Service Worker**: Advanced caching and offline capabilities
 
 ## 🚀 Getting Started
 
@@ -75,8 +82,8 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
    # Google Maps API Key
    VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 
-   # Blockchain Configuration (Polygon)
-   VITE_POLYGON_RPC_URL=https://polygon-mumbai.g.alchemy.com/v2/your-key
+   # Blockchain Configuration (Sepolia Testnet)
+   VITE_POLYGON_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/your-key
    VITE_CONTRACT_ADDRESS=your-nft-contract-address
 
    # IPFS Configuration (for NFT metadata)
@@ -89,10 +96,7 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
    
    Run the Supabase migrations:
    ```bash
-   # If using Supabase CLI
-   supabase db reset
-   
-   # Or apply migrations manually in Supabase dashboard
+   npm run migrate
    ```
 
 5. **Start Development Server**
@@ -120,10 +124,12 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
 - **Row Level Security (RLS)** for data protection
 - **Real-time subscriptions** for live updates
 - **Automated triggers** for maintaining data consistency
+- **Storage buckets** for photo uploads with proper access controls
 
 ### Blockchain Integration
 - **Ethers.js** for Web3 interactions
-- **Polygon Network** for low-cost NFT minting
+- **Sepolia Testnet** for development and testing
+- **Custom ERC-721 Contract** for NFT badge minting
 - **IPFS/Pinata** for decentralized metadata storage
 - **MetaMask** integration for wallet connectivity
 
@@ -166,20 +172,22 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
 ## 🔐 Security & Privacy
 
 ### Authentication
-- Supabase Auth with email/password and OAuth providers
+- Supabase Auth with email/password authentication
 - JWT-based session management
 - Secure password requirements
+- Admin role management
 
 ### Data Protection
 - Row Level Security (RLS) on all tables
 - User data isolation and access controls
 - GDPR-compliant data handling
-- Optional anonymous review submission
+- Secure file upload with size and type restrictions
 
 ### Blockchain Security
 - Client-side wallet integration only
 - No private key storage or handling
 - User-controlled NFT minting process
+- Smart contract security best practices
 
 ## ♿ Accessibility
 
@@ -265,15 +273,22 @@ We welcome contributions from developers, accessibility experts, and community a
 
 ### Supabase Configuration
 1. Create a new Supabase project
-2. Run the provided database migrations
+2. Run the provided database migrations using `npm run migrate`
 3. Configure authentication providers as needed
-4. Set up storage buckets for photo uploads
+4. Set up storage buckets for photo uploads (automatically configured)
 
-### Blockchain Setup (Optional)
-1. Deploy the NFT contract to Polygon network
+### Blockchain Setup
+1. Deploy the NFT contract to Sepolia testnet
 2. Configure contract address in environment variables
 3. Set up Pinata account for IPFS metadata storage
 4. Test NFT minting on testnet before production
+
+### Smart Contract
+The project includes a custom ERC-721 smart contract for minting NFT badges:
+- **Network**: Sepolia Testnet
+- **Features**: Custom minting function with metadata URI
+- **Events**: BadgeMinted event for tracking successful mints
+- **Security**: Ownable pattern for controlled minting
 
 ## 📈 Analytics & Monitoring
 
@@ -291,23 +306,31 @@ We welcome contributions from developers, accessibility experts, and community a
 
 ## 🚀 Deployment
 
-### Netlify (Recommended)
-1. Connect your GitHub repository
-2. Configure build settings:
-   - Build command: `npm run build`
-   - Publish directory: `dist`
-3. Add environment variables in Netlify dashboard
-4. Enable form handling for contact forms
+### Netlify (Current Deployment)
+The application is currently deployed on Netlify at: https://creative-strudel-f01ad0.netlify.app
 
-### Vercel
-1. Import project from GitHub
-2. Configure environment variables
-3. Deploy with automatic CI/CD
+**Deployment Features:**
+- Automatic builds from Git
+- Environment variable management
+- Form handling for contact forms
+- CDN distribution
+- HTTPS by default
 
-### Self-Hosted
+### Manual Deployment
 1. Build the project: `npm run build`
-2. Serve the `dist` directory with any static file server
-3. Configure HTTPS and proper headers for PWA functionality
+2. Deploy the `dist` directory to any static hosting service
+3. Configure environment variables on your hosting platform
+4. Ensure proper headers for PWA functionality
+
+### Environment Variables for Production
+Make sure to set these environment variables in your deployment platform:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_GOOGLE_MAPS_API_KEY`
+- `VITE_POLYGON_RPC_URL`
+- `VITE_CONTRACT_ADDRESS`
+- `VITE_PINATA_API_KEY`
+- `VITE_PINATA_SECRET_KEY`
 
 ## 📄 License
 
@@ -318,7 +341,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Community Support
 - **GitHub Issues**: Bug reports and feature requests
 - **Discussions**: Community Q&A and ideas
-- **Discord**: Real-time community chat (coming soon)
+- **Live Demo**: Test the application at https://creative-strudel-f01ad0.netlify.app
 
 ### Professional Support
 - **Email**: support@maccessmap.org
@@ -339,27 +362,40 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - User authentication and profiles
 - NFT badge system
 - PWA implementation
+- Mobile responsiveness
+- Admin panel
 
 ### Phase 2: Enhanced Features 🚧
 - Advanced search and filtering
 - Offline-first architecture improvements
 - Social features and community building
-- Mobile app development
+- Analytics dashboard
+- API for third-party integrations
 
 ### Phase 3: Scale & Impact 📋
-- API for third-party integrations
 - Government and business partnerships
 - International expansion
 - Advanced analytics and insights
+- Mobile app development
+- Multi-language support
 
 ### Phase 4: Innovation 🔮
 - AI-powered accessibility predictions
 - AR/VR integration for immersive reviews
 - IoT sensor integration
 - Blockchain governance features
+- Machine learning for review verification
+
+## 🔗 Quick Links
+
+- **Live Application**: https://creative-strudel-f01ad0.netlify.app
+- **Demo Accounts**: Use the quick login buttons on the auth page
+- **Admin Panel**: Available for admin users at `/admin`
+- **API Documentation**: Coming soon
+- **Smart Contract**: Deployed on Sepolia testnet
 
 ---
 
 **Together, we're building a more accessible world, one review at a time.** 🌍♿
 
-For more information, visit [maccessmap.org](https://maccessmap.org) or follow us on social media for updates and community highlights.
+For more information, visit the live application at https://creative-strudel-f01ad0.netlify.app or follow us on social media for updates and community highlights.

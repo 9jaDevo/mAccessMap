@@ -75,10 +75,25 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
     });
   }, [locations, onLocationSelect, isLoaded]);
 
-  // Highlight selected location
+  // Center map on selected location and highlight marker
   useEffect(() => {
-    if (!selectedLocation || !window.google || !isLoaded) return;
+    if (!selectedLocation || !mapInstanceRef.current || !window.google || !isLoaded) return;
 
+    // Pan to the selected location
+    const selectedPosition = {
+      lat: Number(selectedLocation.latitude),
+      lng: Number(selectedLocation.longitude)
+    };
+    
+    mapInstanceRef.current.panTo(selectedPosition);
+    
+    // Optionally adjust zoom for better visibility
+    const currentZoom = mapInstanceRef.current.getZoom();
+    if (currentZoom < 15) {
+      mapInstanceRef.current.setZoom(15);
+    }
+
+    // Update marker styles to highlight selected location
     markersRef.current.forEach((marker, index) => {
       const location = locations[index];
       const isSelected = location.id === selectedLocation.id;

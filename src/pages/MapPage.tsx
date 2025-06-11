@@ -48,6 +48,7 @@ export const MapPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [showMobileMap, setShowMobileMap] = useState(false);
 
   // Get unique categories from locations
   const categories = ['all', ...Array.from(new Set(allLocations.map(l => l.category)))];
@@ -82,10 +83,18 @@ export const MapPage: React.FC = () => {
 
   const handleLocationSelect = (location: Location) => {
     setSelectedLocation(location);
+    // On mobile, show the map when a location is selected
+    if (window.innerWidth < 768) {
+      setShowMobileMap(true);
+    }
   };
 
   const handleAddReview = () => {
     window.location.href = '/review';
+  };
+
+  const toggleMobileView = () => {
+    setShowMobileMap(!showMobileMap);
   };
 
   if (locationsLoading) {
@@ -101,9 +110,35 @@ export const MapPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex">
-      {/* Sidebar */}
-      <div className="w-full md:w-96 bg-white shadow-lg flex flex-col">
+    <div className="h-screen flex flex-col md:flex-row">
+      {/* Mobile Toggle Buttons */}
+      <div className="md:hidden bg-white border-b border-gray-200 p-2 flex justify-center space-x-2">
+        <button
+          onClick={() => setShowMobileMap(false)}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+            !showMobileMap
+              ? 'bg-emerald-600 text-white'
+              : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          List View
+        </button>
+        <button
+          onClick={() => setShowMobileMap(true)}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+            showMobileMap
+              ? 'bg-emerald-600 text-white'
+              : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          Map View
+        </button>
+      </div>
+
+      {/* Sidebar - Hidden on mobile when map is shown */}
+      <div className={`w-full md:w-96 bg-white shadow-lg flex flex-col ${
+        showMobileMap ? 'hidden md:flex' : 'flex'
+      }`}>
         {/* Search and Filters */}
         <div className="p-4 border-b bg-gray-50">
           <div className="relative mb-4">
@@ -185,8 +220,10 @@ export const MapPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Map Area */}
-      <div className="hidden md:flex flex-1 relative">
+      {/* Map Area - Always visible on desktop, toggleable on mobile */}
+      <div className={`flex-1 relative ${
+        showMobileMap ? 'flex' : 'hidden md:flex'
+      }`}>
         <GoogleMap
           locations={filteredLocations}
           selectedLocation={selectedLocation}
@@ -290,20 +327,16 @@ export const MapPage: React.FC = () => {
         >
           <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
         </button>
-      </div>
 
-      {/* Mobile Map Toggle */}
-      <div className="md:hidden fixed bottom-4 right-4 flex flex-col space-y-3">
-        <button
-          onClick={handleAddReview}
-          className="w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
-          title="Add accessibility review"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-        <button className="w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center">
-          <MapPin className="w-6 h-6" />
-        </button>
+        {/* Mobile Back to List Button */}
+        {showMobileMap && (
+          <button
+            onClick={() => setShowMobileMap(false)}
+            className="md:hidden absolute top-6 left-6 bg-white text-gray-700 px-4 py-2 rounded-lg shadow-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            ← Back to List
+          </button>
+        )}
       </div>
     </div>
   );

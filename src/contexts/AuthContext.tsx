@@ -35,144 +35,258 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Error during sign out:', error);
-      }
-    } catch (error) {
-      console.error('Unexpected error during sign out:', error);
-    } finally {
-      // Always clear local state regardless of API response
-      setSession(null);
-      setUser(null);
-      setIsAdmin(false);
-      // Redirect to auth page to ensure clean state
-      navigate('/auth');
-    }
+  // Clear all authentication state
+  const clearAuthState = () => {
+    console.log('AuthContext: Clearing authentication state');
+    setSession(null);
+    setUser(null);
+    setIsAdmin(false);
   };
 
-  const checkUserProfile = async (currentUser: User) => {
+  // Check user profile and admin status
+  const checkUserProfile = async (currentUser: User): Promise<boolean> => {
+    console.log('AuthContext: Checking user profile for:', currentUser.id);
+    
     try {
       const profile = await getUserProfile(currentUser.id);
-      setIsAdmin(profile?.is_admin || false);
-      return true;
+      
+      if (profile) {
+        console.log('AuthContext: Profile found, admin status:', profile.is_admin);
+        setIsAdmin(profile.is_admin || false);
+        return true;
+      } else {
+        console.warn('AuthContext: No profile found for user');
+        setIsAdmin(false);
+        return true;
+      }
     } catch (error: any) {
-      console.error('Error fetching user profile:', error);
+      console.error('AuthContext: Error fetching user profile:', error);
       
       // Check if this is an authentication error
-      if (error?.message?.includes('JWT') || 
-          error?.message?.includes('token') || 
-          error?.message?.includes('expired') ||
-          error?.message?.includes('invalid') ||
-          error?.code === 'PGRST301' || // PostgREST JWT expired
-          error?.code === 'PGRST302') { // PostgREST JWT invalid
-        
-        console.warn('Authentication token appears to be invalid, signing out user');
+      const isAuthError = error?.message?.includes('JWT') || 
+                         error?.message?.includes('token') || 
+                         error?.message?.includes('expired') ||
+                         error?.message?.includes('invalid') ||
+                         error?.code === 'PGRST301' || // PostgREST JWT expired
+                         error?.code === 'PGRST302';   // PostgREST JWT invalid
+      
+      if (isAuthError) {
+        console.warn('AuthContext: Authentication token appears to be invalid, signing out user');
         await handleSignOut();
         return false;
       }
       
       // For other errors, just set admin to false but keep user logged in
+      console.warn('AuthContext: Non-auth error, setting admin to false');
       setIsAdmin(false);
       return true;
     }
   };
 
+  // Handle sign out with proper cleanup
+  const handleSignOut = async () => {
+    console.log('AuthContext: Starting sign out process');
+    
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('AuthContext: Error during Supabase sign out:', error);
+      } else {
+        console.log('AuthContext: Supabase sign out successful');
+      }
+    } catch (error) {
+      console.error('AuthContext: Unexpected error during sign out:', error);
+    } finally {
+      // Always clear local state regardless of API response
+      clearAuthState();
+      console.log('AuthContext: Redirecting to auth page');
+      navigate('/auth');
+    }
+  };
+
+  // Initialize authentication state
   useEffect(() => {
-    const getSession = async () => {
+    console.log('AuthContext: Initializing authentication state');
+    
+    const initializeAuth = async () => {
       try {
+        console.log('AuthContext: Getting initial session');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
-          setSession(null);
-          setUser(null);
-          setIsAdmin(false);
-          setLoading(false);
+          console.error('AuthContext: Error getting initial session:', error);
+          clearAuthState();
           return;
         }
 
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Check admin status if user exists
         if (session?.user) {
-          await checkUserProfile(session.user);
+          console.log('AuthContext: Initial session found for user:', session.user.id);
+          setSession(session);
+          setUser(session.user);
+          
+          // Check admin status
+          const profileCheckSuccess = await checkUserProfile(session.user);
+          if (!profileCheckSuccess) {
+            console.log('AuthContext: Profile check failed, user was signed out');
+            return;
+          }
         } else {
-          setIsAdmin(false);
+          console.log('AuthContext: No initial session found');
+          clearAuthState();
         }
       } catch (error) {
-        console.error('Unexpected error getting session:', error);
-        setSession(null);
-        setUser(null);
-        setIsAdmin(false);
+        console.error('AuthContext: Unexpected error during initialization:', error);
+        clearAuthState();
       } finally {
+        console.log('AuthContext: Setting loading to false');
         setLoading(false);
       }
     };
 
-    getSession();
+    initializeAuth();
+  }, []);
 
+  // Listen for authentication state changes
+  useEffect(() => {
+    console.log('AuthContext: Setting up auth state change listener');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log('AuthContext: Auth state changed:', event, session?.user?.id || 'no user');
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Handle different auth events
-        if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
-          setIsAdmin(false);
-          setLoading(false);
-          navigate('/auth');
-          return;
-        }
-        
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          if (session?.user) {
-            const profileCheckSuccess = await checkUserProfile(session.user);
-            if (!profileCheckSuccess) {
-              // User was signed out due to invalid token
-              setLoading(false);
-              return;
-            }
-          } else {
-            setIsAdmin(false);
+        try {
+          // Handle different auth events
+          switch (event) {
+            case 'SIGNED_OUT':
+              console.log('AuthContext: User signed out');
+              clearAuthState();
+              navigate('/auth');
+              break;
+              
+            case 'SIGNED_IN':
+              console.log('AuthContext: User signed in');
+              if (session?.user) {
+                setSession(session);
+                setUser(session.user);
+                
+                const profileCheckSuccess = await checkUserProfile(session.user);
+                if (!profileCheckSuccess) {
+                  console.log('AuthContext: Profile check failed during sign in');
+                  return;
+                }
+              } else {
+                console.warn('AuthContext: SIGNED_IN event but no user in session');
+                clearAuthState();
+              }
+              break;
+              
+            case 'TOKEN_REFRESHED':
+              console.log('AuthContext: Token refreshed');
+              if (session?.user) {
+                setSession(session);
+                setUser(session.user);
+                
+                // Re-check profile in case admin status changed
+                const profileCheckSuccess = await checkUserProfile(session.user);
+                if (!profileCheckSuccess) {
+                  console.log('AuthContext: Profile check failed during token refresh');
+                  return;
+                }
+              } else {
+                console.warn('AuthContext: TOKEN_REFRESHED but no session, signing out');
+                clearAuthState();
+                navigate('/auth');
+              }
+              break;
+              
+            case 'USER_UPDATED':
+              console.log('AuthContext: User updated');
+              if (session?.user) {
+                setSession(session);
+                setUser(session.user);
+              }
+              break;
+              
+            default:
+              console.log('AuthContext: Unhandled auth event:', event);
           }
+        } catch (error) {
+          console.error('AuthContext: Error handling auth state change:', error);
+          clearAuthState();
+        } finally {
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('AuthContext: Cleaning up auth state change listener');
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
+    console.log('AuthContext: Starting sign up for:', email);
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
         },
-      },
-    });
-    if (error) throw error;
+      });
+      
+      if (error) {
+        console.error('AuthContext: Sign up error:', error);
+        throw error;
+      }
+      
+      console.log('AuthContext: Sign up successful');
+    } catch (error) {
+      console.error('AuthContext: Sign up failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
+    console.log('AuthContext: Starting sign in for:', email);
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error('AuthContext: Sign in error:', error);
+        throw error;
+      }
+      
+      console.log('AuthContext: Sign in successful');
+    } catch (error) {
+      console.error('AuthContext: Sign in failed:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
-    await handleSignOut();
+    console.log('AuthContext: Sign out requested');
+    setLoading(true);
+    
+    try {
+      await handleSignOut();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = {
@@ -184,6 +298,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signOut,
   };
+
+  console.log('AuthContext: Rendering with state:', {
+    hasUser: !!user,
+    hasSession: !!session,
+    loading,
+    isAdmin,
+    userId: user?.id
+  });
 
   return (
     <AuthContext.Provider value={value}>

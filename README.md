@@ -392,7 +392,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - AR/VR integration for immersive reviews
 - IoT sensor integration
 - Blockchain governance features
-- Machine learning for review verification
+- AI Accessibility Assistant
 
 ## 🔗 Quick Links
 

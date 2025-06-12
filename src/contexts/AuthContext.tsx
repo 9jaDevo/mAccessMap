@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getUserProfile } from '../lib/database';
+import { showToast } from '../components/Toaster';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -84,24 +85,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Memoize the handleSignOut function
+  // Memoize the handleSignOut function with detailed logging and timeout
   const handleSignOut = useCallback(async () => {
     console.log('AuthContext: Starting sign out process');
     
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('AuthContext: Error during Supabase sign out:', error);
-      } else {
-        console.log('AuthContext: Supabase sign out successful');
+      // Show immediate feedback to user
+      showToast('info', 'Signing out...');
+      
+      // Set a timeout to prevent hanging indefinitely
+      const signOutPromise = supabase.auth.signOut();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Sign out timeout')), 10000); // 10 second timeout
+      });
+      
+      console.log('AuthContext: Calling supabase.auth.signOut()...');
+      const startTime = Date.now();
+      
+      try {
+        const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
+        const endTime = Date.now();
+        
+        console.log(`AuthContext: supabase.auth.signOut() completed in ${endTime - startTime}ms`);
+        
+        if (error) {
+          console.error('AuthContext: Supabase sign out returned error:', error);
+          showToast('warning', 'Sign out completed with warnings');
+        } else {
+          console.log('AuthContext: Supabase sign out successful');
+          showToast('success', 'Successfully signed out');
+        }
+      } catch (timeoutError) {
+        console.error('AuthContext: Sign out timed out or failed:', timeoutError);
+        showToast('warning', 'Sign out may have timed out, clearing local session');
       }
+      
     } catch (error) {
       console.error('AuthContext: Unexpected error during sign out:', error);
+      showToast('error', 'Error during sign out, clearing local session');
     } finally {
       // Always clear local state regardless of API response
+      console.log('AuthContext: Clearing local authentication state');
       clearAuthState();
+      
       console.log('AuthContext: Redirecting to auth page');
       navigate('/auth');
+      
+      // Additional feedback
+      showToast('info', 'You have been signed out');
     }
   }, [clearAuthState, navigate]);
 
@@ -173,6 +204,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               console.log('AuthContext: User signed out');
               clearAuthState();
               navigate('/auth');
+              showToast('success', 'You have been signed out successfully');
               break;
               
             case 'SIGNED_IN':
@@ -186,6 +218,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   console.log('AuthContext: Profile check failed during sign in');
                   return;
                 }
+                showToast('success', 'Successfully signed in');
               } else {
                 console.warn('AuthContext: SIGNED_IN event but no user in session');
                 clearAuthState();
@@ -231,6 +264,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('AuthContext: Error handling auth state change:', error);
           clearAuthState();
+          showToast('error', 'Authentication error occurred');
         } finally {
           setLoading(false);
         }
@@ -249,6 +283,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     
     try {
+      showToast('info', 'Creating your account...');
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -261,10 +297,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (error) {
         console.error('AuthContext: Sign up error:', error);
+        showToast('error', error.message);
         throw error;
       }
       
       console.log('AuthContext: Sign up successful');
+      showToast('success', 'Account created successfully!');
     } catch (error) {
       console.error('AuthContext: Sign up failed:', error);
       throw error;
@@ -279,6 +317,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     
     try {
+      showToast('info', 'Signing you in...');
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -286,6 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (error) {
         console.error('AuthContext: Sign in error:', error);
+        showToast('error', error.message);
         throw error;
       }
       
@@ -305,6 +346,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     try {
       await handleSignOut();
+    } catch (error) {
+      console.error('AuthContext: Sign out process failed:', error);
+      showToast('error', 'Error during sign out process');
     } finally {
       setLoading(false);
     }

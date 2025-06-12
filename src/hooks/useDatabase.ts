@@ -3,32 +3,18 @@ import { useAuth } from '../contexts/AuthContext';
 import * as db from '../lib/database';
 
 export const useUserProfile = () => {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<db.UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, userProfile, loading: authLoading } = useAuth();
 
-  const fetchProfile = async () => {
-    if (!user) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const userProfile = await db.getUserProfile(user.id);
-      setProfile(userProfile);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    } finally {
-      setLoading(false);
+  // Return the profile data directly from AuthContext
+  return { 
+    profile: userProfile, 
+    loading: authLoading, 
+    refetch: () => {
+      // Profile refetching is now handled by AuthContext
+      // This function is kept for compatibility but doesn't need to do anything
+      console.log('useUserProfile: refetch called - profile is managed by AuthContext');
     }
   };
-
-  useEffect(() => {
-    fetchProfile();
-  }, [user]);
-
-  return { profile, loading, refetch: fetchProfile };
 };
 
 export const useLocations = () => {

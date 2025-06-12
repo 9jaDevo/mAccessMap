@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { getUserProfile } from '../lib/database';
+import { getUserProfile, type UserProfile } from '../lib/database';
 import { showToast } from '../components/Toaster';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
@@ -32,21 +33,23 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [initialSessionProcessed, setInitialSessionProcessed] = useState(false);
   const navigate = useNavigate();
 
-  // Memoize the clearAuthState function - removed isAdmin from dependencies
+  // Memoize the clearAuthState function
   const clearAuthState = useCallback(() => {
     console.log('AuthContext: [clearAuthState] Clearing authentication state');
     setSession(null);
     setUser(null);
+    setUserProfile(null);
     setIsAdmin(false);
-    console.log('AuthContext: [clearAuthState] isAdmin state after clearing: false');
-  }, []); // No dependencies needed for clearing state
+    console.log('AuthContext: [clearAuthState] All state cleared');
+  }, []);
 
-  // Memoize the checkUserProfile function - removed isAdmin from dependencies
+  // Memoize the checkUserProfile function
   const checkUserProfile = useCallback(async (currentUser: User): Promise<boolean> => {
     console.log('AuthContext: [checkUserProfile] Starting profile check for user:', currentUser.id);
     
@@ -61,16 +64,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           totalReviews: profile.total_reviews
         });
         
+        // Store the complete profile in context
+        setUserProfile(profile);
+        
         const newAdminStatus = profile.is_admin || false;
         console.log('AuthContext: [checkUserProfile] Setting isAdmin to:', newAdminStatus);
         
         setIsAdmin(newAdminStatus);
         
-        console.log('AuthContext: [checkUserProfile] isAdmin state updated successfully');
+        console.log('AuthContext: [checkUserProfile] Profile and admin status updated successfully');
         return true;
       } else {
         console.warn('AuthContext: [checkUserProfile] No profile found for user');
-        console.log('AuthContext: [checkUserProfile] Setting isAdmin to false (no profile)');
+        console.log('AuthContext: [checkUserProfile] Setting profile to null and isAdmin to false');
+        setUserProfile(null);
         setIsAdmin(false);
         return true;
       }
@@ -96,14 +103,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
       
-      // For other errors, just set admin to false but keep user logged in
-      console.warn('AuthContext: [checkUserProfile] Non-auth error, setting isAdmin to false');
+      // For other errors, just clear profile and set admin to false but keep user logged in
+      console.warn('AuthContext: [checkUserProfile] Non-auth error, clearing profile and setting isAdmin to false');
+      setUserProfile(null);
       setIsAdmin(false);
       return true;
     }
-  }, []); // Removed isAdmin dependency - function doesn't need current isAdmin value
+  }, []);
 
-  // Improved sign out function - removed isAdmin from dependencies
+  // Improved sign out function
   const handleSignOut = useCallback(async () => {
     console.log('AuthContext: [handleSignOut] Starting sign out process');
     
@@ -147,7 +155,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       navigate('/auth');
       showToast('success', 'Signed out locally');
     }
-  }, [clearAuthState, navigate]); // Removed isAdmin dependency
+  }, [clearAuthState, navigate]);
 
   // Initialize authentication state
   useEffect(() => {
@@ -169,8 +177,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(session);
           setUser(session.user);
           
-          // Check admin status
-          console.log('AuthContext: [initializeAuth] Checking admin status for initial session');
+          // Check admin status and load profile
+          console.log('AuthContext: [initializeAuth] Checking profile and admin status for initial session');
           const profileCheckSuccess = await checkUserProfile(session.user);
           if (!profileCheckSuccess) {
             console.log('AuthContext: [initializeAuth] Profile check failed, user was signed out');
@@ -193,7 +201,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
   }, [clearAuthState, checkUserProfile]);
 
-  // Listen for authentication state changes - removed isAdmin from dependencies
+  // Listen for authentication state changes
   useEffect(() => {
     console.log('AuthContext: [useEffect-listener] Setting up auth state change listener');
     
@@ -306,7 +314,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('AuthContext: [useEffect-listener] Cleaning up auth state change listener');
       subscription.unsubscribe();
     };
-  }, [clearAuthState, checkUserProfile, navigate, initialSessionProcessed]); // Removed isAdmin dependency
+  }, [clearAuthState, checkUserProfile, navigate, initialSessionProcessed]);
 
   // Memoize the signUp function with detailed logging
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
@@ -424,16 +432,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value = useMemo(() => ({
     user,
     session,
+    userProfile,
     loading,
     isAdmin,
     signUp,
     signIn,
     signOut,
-  }), [user, session, loading, isAdmin, signUp, signIn, signOut]);
+  }), [user, session, userProfile, loading, isAdmin, signUp, signIn, signOut]);
 
   console.log('AuthContext: [render] Rendering with state:', {
     hasUser: !!user,
     hasSession: !!session,
+    hasUserProfile: !!userProfile,
     loading,
     isAdmin,
     userId: user?.id,

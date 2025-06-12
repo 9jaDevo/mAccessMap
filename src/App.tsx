@@ -29,8 +29,8 @@ import { Toaster } from './components/Toaster';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <GoogleMapsProvider>
           <ScrollToTop />
           <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -64,8 +64,8 @@ function App() {
             <DonateButton />
           </div>
         </GoogleMapsProvider>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

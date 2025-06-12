@@ -205,11 +205,13 @@ export const createLocation = async (location: Omit<Location, 'id' | 'created_at
     
     // INSERT: Create new location since none exists
     console.log('createLocation: About to insert');
+    
     const { data, error } = await supabase
       .from('locations')
       .insert(location)
       .select()
       .single();
+    
     console.log('createLocation: Finish to insert');
 
     const endTime = Date.now();

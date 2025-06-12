@@ -3,8 +3,30 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// Register service worker for PWA functionality
-if ('serviceWorker' in navigator) {
+// Check if we're in a supported environment for Service Workers
+const isServiceWorkerSupported = () => {
+  // Check if Service Workers are supported
+  if (!('serviceWorker' in navigator)) {
+    return false;
+  }
+  
+  // Check if we're in StackBlitz or other environments that don't support SW
+  const hostname = window.location.hostname;
+  const isStackBlitz = hostname.includes('stackblitz') || hostname.includes('webcontainer');
+  const isCodeSandbox = hostname.includes('codesandbox');
+  const isGitpod = hostname.includes('gitpod');
+  
+  // Return false for known unsupported environments
+  if (isStackBlitz || isCodeSandbox || isGitpod) {
+    console.log('Service Workers not supported in this development environment');
+    return false;
+  }
+  
+  return true;
+};
+
+// Register service worker for PWA functionality only in supported environments
+if (isServiceWorkerSupported()) {
   window.addEventListener('load', async () => {
     try {
       const registration = await navigator.serviceWorker.register('/service-worker.js', {
@@ -145,8 +167,8 @@ window.addEventListener('online', () => {
   // Show online notification
   showNetworkStatus('online');
   
-  // Trigger background sync if service worker supports it
-  if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+  // Trigger background sync if service worker supports it and is available
+  if (isServiceWorkerSupported() && 'sync' in window.ServiceWorkerRegistration.prototype) {
     navigator.serviceWorker.ready.then((registration) => {
       return registration.sync.register('background-sync-reviews');
     }).catch((error) => {

@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Memoize the handleSignOut function with detailed logging and timeout
+  // Improved sign out function with better error handling and shorter timeout
   const handleSignOut = useCallback(async () => {
     console.log('AuthContext: Starting sign out process');
     
@@ -93,46 +93,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Show immediate feedback to user
       showToast('info', 'Signing out...');
       
-      // Set a timeout to prevent hanging indefinitely
+      // Clear local state immediately to provide instant feedback
+      clearAuthState();
+      
+      // Navigate immediately to prevent user from being stuck
+      navigate('/auth');
+      
+      // Try to sign out from Supabase with a shorter timeout
+      console.log('AuthContext: Attempting Supabase sign out...');
       const signOutPromise = supabase.auth.signOut();
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Sign out timeout')), 10000); // 10 second timeout
+        setTimeout(() => reject(new Error('Sign out timeout')), 5000); // Reduced to 5 seconds
       });
-      
-      console.log('AuthContext: Calling supabase.auth.signOut()...');
-      const startTime = Date.now();
       
       try {
         const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
-        const endTime = Date.now();
-        
-        console.log(`AuthContext: supabase.auth.signOut() completed in ${endTime - startTime}ms`);
         
         if (error) {
-          console.error('AuthContext: Supabase sign out returned error:', error);
-          showToast('warning', 'Sign out completed with warnings');
+          console.warn('AuthContext: Supabase sign out returned error:', error);
+          // Don't show error to user since local state is already cleared
         } else {
           console.log('AuthContext: Supabase sign out successful');
-          showToast('success', 'Successfully signed out');
         }
       } catch (timeoutError) {
-        console.error('AuthContext: Sign out timed out or failed:', timeoutError);
-        showToast('warning', 'Sign out may have timed out, clearing local session');
+        console.warn('AuthContext: Supabase sign out timed out, but local state already cleared');
+        // This is acceptable since we've already cleared local state
       }
+      
+      showToast('success', 'Successfully signed out');
       
     } catch (error) {
       console.error('AuthContext: Unexpected error during sign out:', error);
-      showToast('error', 'Error during sign out, clearing local session');
-    } finally {
-      // Always clear local state regardless of API response
-      console.log('AuthContext: Clearing local authentication state');
+      // Even if there's an error, ensure local state is cleared
       clearAuthState();
-      
-      console.log('AuthContext: Redirecting to auth page');
       navigate('/auth');
-      
-      // Additional feedback
-      showToast('info', 'You have been signed out');
+      showToast('success', 'Signed out locally');
     }
   }, [clearAuthState, navigate]);
 

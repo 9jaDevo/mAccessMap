@@ -58,10 +58,10 @@ export const uploadPhoto = async (
         upsert: false,
       });
 
-    // Wrap the upload with a timeout (30 seconds for file uploads)
+    // Wrap the upload with a timeout (60 seconds for file uploads)
     const { data, error } = await withTimeout(
       uploadPromise,
-      30000, // 30 seconds timeout for file uploads
+      60000, // 60 seconds timeout for file uploads
       'Storage upload'
     );
 

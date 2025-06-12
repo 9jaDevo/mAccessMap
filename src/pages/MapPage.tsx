@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapPin, Filter, Search, Star, Camera, Armchair as Wheelchair, Volume2, Eye, DoorOpen, Plus } from 'lucide-react';
 import { GoogleMap } from '../components/GoogleMap';
 import { useLocations } from '../hooks/useDatabase';
@@ -42,6 +43,7 @@ const categoryDisplayNames: Record<string, string> = {
 };
 
 export const MapPage: React.FC = () => {
+  const navigate = useNavigate();
   const { locations: allLocations, loading: locationsLoading } = useLocations();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,7 +92,16 @@ export const MapPage: React.FC = () => {
   };
 
   const handleAddReview = () => {
-    window.location.href = '/review';
+    navigate('/review');
+  };
+
+  const handleAddReviewForLocation = (location: Location) => {
+    // Navigate to review page with location pre-filled
+    const params = new URLSearchParams({
+      location: location.name,
+      address: location.address
+    });
+    navigate(`/review?${params.toString()}`);
   };
 
   const toggleMobileView = () => {
@@ -274,10 +285,7 @@ export const MapPage: React.FC = () => {
             
             <div className="flex space-x-3">
               <button 
-                onClick={() => {
-                  // Navigate to review page with location pre-filled
-                  window.location.href = `/review?location=${encodeURIComponent(selectedLocation.name)}&address=${encodeURIComponent(selectedLocation.address)}`;
-                }}
+                onClick={() => handleAddReviewForLocation(selectedLocation)}
                 className="flex-1 bg-emerald-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center space-x-2"
               >
                 <Camera className="w-4 h-4" />

@@ -75,6 +75,18 @@ export const ProfilePage: React.FC = () => {
     navigate('/profile/reviews');
   };
 
+  const handleAddReview = () => {
+    navigate('/review');
+  };
+
+  const handleExploreMap = () => {
+    navigate('/map');
+  };
+
+  const handleViewBadges = () => {
+    navigate('/badges');
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -194,12 +206,12 @@ export const ProfilePage: React.FC = () => {
                   <Camera className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-600 mb-2">No reviews yet</h3>
                   <p className="text-gray-500 mb-4">Start contributing by adding your first accessibility review!</p>
-                  <a
-                    href="/review"
+                  <button
+                    onClick={handleAddReview}
                     className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
                   >
                     Add Your First Review
-                  </a>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -297,29 +309,29 @@ export const ProfilePage: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
               
               <div className="space-y-3">
-                <a
-                  href="/review"
+                <button
+                  onClick={handleAddReview}
                   className="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center space-x-2"
                 >
                   <Camera className="w-4 h-4" />
                   <span>Add New Review</span>
-                </a>
+                </button>
                 
-                <a
-                  href="/map"
+                <button
+                  onClick={handleExploreMap}
                   className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center space-x-2"
                 >
                   <MapPin className="w-4 h-4" />
                   <span>Explore Map</span>
-                </a>
+                </button>
                 
-                <a
-                  href="/badges"
+                <button
+                  onClick={handleViewBadges}
                   className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center space-x-2"
                 >
                   <Award className="w-4 h-4" />
                   <span>View Badges</span>
-                </a>
+                </button>
               </div>
             </div>
 
@@ -397,12 +409,12 @@ export const ProfilePage: React.FC = () => {
                   ))}
                   
                   {badges.length > 3 && (
-                    <a
-                      href="/badges"
-                      className="block text-center text-emerald-600 hover:text-emerald-700 font-medium text-sm pt-2"
+                    <button
+                      onClick={handleViewBadges}
+                      className="block text-center text-emerald-600 hover:text-emerald-700 font-medium text-sm pt-2 w-full"
                     >
                       View All {badges.length} Badges
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

@@ -90,6 +90,9 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
    VITE_IPFS_GATEWAY=https://gateway.pinata.cloud/ipfs/
    VITE_PINATA_API_KEY=your-pinata-api-key
    VITE_PINATA_SECRET_KEY=your-pinata-secret-key
+
+   # HuggingFace API Key (for AI suggestions)
+   VITE_HUGGING_FACE_API_KEY=your-huggingface-api-key
    ```
 
 4. **Database Setup**
@@ -132,6 +135,11 @@ mAccessMap is a Progressive Web App (PWA) that helps create a more inclusive wor
 - **Custom ERC-721 Contract** for NFT badge minting
 - **IPFS/Pinata** for decentralized metadata storage
 - **MetaMask** integration for wallet connectivity
+
+### AI-Powered Features
+-  **Smart Accessibility Detection**: HuggingFace BART model integration for intelligent feature suggestions
+-  **Fallback System**: Keyword-based suggestions when AI is unavailable
+-  **User-Friendly Interface**: Purple gradient AI button with sparkles and loading states
 
 ### PWA Features
 - **Service Worker** for offline functionality and caching

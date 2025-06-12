@@ -179,7 +179,7 @@ export const createLocation = async (location: Omit<Location, 'id' | 'created_at
       .select('*')
       .eq('name', location.name)
       .eq('address', location.address)
-      .single();
+      .maybeSingle();
 
     console.log('createLocation: Fetch query completed');
     console.log('createLocation: Existing location data:', existingLocation);
@@ -191,8 +191,8 @@ export const createLocation = async (location: Omit<Location, 'id' | 'created_at
       return existingLocation;
     }
 
-    // If the error is not "no rows found", it's a real error
-    if (fetchError && fetchError.code !== 'PGRST116') {
+    // If there's a fetch error that's not expected, handle it
+    if (fetchError) {
       console.error('createLocation: Unexpected error during fetch:', fetchError);
       handleDatabaseError(fetchError, 'createLocation (fetch phase)');
     }

@@ -272,15 +272,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [clearAuthState, checkUserProfile, navigate, initialSessionProcessed]);
 
-  // Memoize the signUp function
+  // Memoize the signUp function with detailed logging
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    console.log('AuthContext: Starting sign up for:', email);
+    console.log('AuthContext: Starting sign up process');
+    console.log('AuthContext: Sign up email:', email);
+    console.log('AuthContext: Sign up full name:', fullName);
+    console.log('AuthContext: Password length:', password.length);
+    
     setLoading(true);
     
     try {
       showToast('info', 'Creating your account...');
       
-      const { error } = await supabase.auth.signUp({
+      console.log('AuthContext: Calling supabase.auth.signUp...');
+      const startTime = Date.now();
+      
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -290,13 +297,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         },
       });
       
+      const endTime = Date.now();
+      console.log('AuthContext: supabase.auth.signUp completed in', endTime - startTime, 'ms');
+      console.log('AuthContext: Sign up response data:', data);
+      console.log('AuthContext: Sign up response error:', error);
+      
       if (error) {
-        console.error('AuthContext: Sign up error:', error);
+        console.error('AuthContext: Sign up error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
         showToast('error', error.message);
         throw error;
       }
       
       console.log('AuthContext: Sign up successful');
+      console.log('AuthContext: User created:', data.user?.id);
+      console.log('AuthContext: Session created:', !!data.session);
       showToast('success', 'Account created successfully!');
     } catch (error) {
       console.error('AuthContext: Sign up failed:', error);
@@ -306,26 +324,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Memoize the signIn function
+  // Memoize the signIn function with detailed logging
   const signIn = useCallback(async (email: string, password: string) => {
-    console.log('AuthContext: Starting sign in for:', email);
+    console.log('AuthContext: Starting sign in process');
+    console.log('AuthContext: Sign in email:', email);
+    console.log('AuthContext: Password length:', password.length);
+    
     setLoading(true);
     
     try {
       showToast('info', 'Signing you in...');
       
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('AuthContext: Calling supabase.auth.signInWithPassword...');
+      const startTime = Date.now();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
+      const endTime = Date.now();
+      console.log('AuthContext: supabase.auth.signInWithPassword completed in', endTime - startTime, 'ms');
+      console.log('AuthContext: Sign in response data:', data);
+      console.log('AuthContext: Sign in response error:', error);
+      
       if (error) {
-        console.error('AuthContext: Sign in error:', error);
+        console.error('AuthContext: Sign in error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
         showToast('error', error.message);
         throw error;
       }
       
       console.log('AuthContext: Sign in successful');
+      console.log('AuthContext: User signed in:', data.user?.id);
+      console.log('AuthContext: Session created:', !!data.session);
     } catch (error) {
       console.error('AuthContext: Sign in failed:', error);
       throw error;

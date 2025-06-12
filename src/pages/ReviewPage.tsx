@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, MapPin, Star, Check, Armchair as Wheelchair, Volume2, Eye, DoorOpen, Navigation } from 'lucide-react';
+import { Camera, MapPin, Star, Check, Armchair as Wheelchair, Volume2, Eye, DoorOpen, Navigation, Sparkles, Loader } from 'lucide-react';
 import { showToast } from '../components/Toaster';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { useWallet } from '../hooks/useWallet';
 import { createLocation, createReview } from '../lib/database';
 import { triggerBadgeCheckAfterReview } from '../lib/badgeSystem';
+import { suggestAccessibilityFeatures, getAISuggestionExplanation } from '../lib/ai';
 import { PhotoUpload } from '../components/PhotoUpload';
 import { type UploadResult } from '../lib/storage';
 
@@ -64,6 +65,11 @@ export const ReviewPage: React.FC = () => {
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadResult[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locatingUser, setLocatingUser] = useState(false);
+  
+  // AI suggestion states
+  const [isLoadingAISuggestions, setIsLoadingAISuggestions] = useState(false);
+  const [aiSuggestionExplanation, setAiSuggestionExplanation] = useState<string>('');
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
 
   // Initialize Google Places Autocomplete
   useEffect(() => {
@@ -201,6 +207,62 @@ export const ReviewPage: React.FC = () => {
     }));
   };
 
+  // AI suggestion handler
+  const handleAISuggestions = async () => {
+    if (!formData.comments.trim()) {
+      showToast('warning', 'Please add some comments first to get AI suggestions');
+      return;
+    }
+
+    if (formData.comments.trim().length < 10) {
+      showToast('info', 'Please write a more detailed comment for better AI suggestions');
+      return;
+    }
+
+    setIsLoadingAISuggestions(true);
+    setShowAISuggestions(false);
+    setAiSuggestionExplanation('');
+
+    try {
+      console.log('ReviewPage: Requesting AI suggestions for comments:', formData.comments);
+      const suggestedFeatures = await suggestAccessibilityFeatures(formData.comments);
+      console.log('ReviewPage: Received AI suggestions:', suggestedFeatures);
+
+      if (suggestedFeatures.length > 0) {
+        // Add new suggestions to existing features (avoid duplicates)
+        const newFeatures = suggestedFeatures.filter(feature => !formData.features.includes(feature));
+        
+        if (newFeatures.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            features: [...prev.features, ...newFeatures],
+          }));
+
+          // Generate explanation
+          const explanation = getAISuggestionExplanation(suggestedFeatures, formData.comments);
+          setAiSuggestionExplanation(explanation);
+          setShowAISuggestions(true);
+
+          showToast('success', `AI suggested ${newFeatures.length} accessibility feature${newFeatures.length > 1 ? 's' : ''}!`);
+        } else {
+          showToast('info', 'AI detected features you already selected - great job!');
+          const explanation = getAISuggestionExplanation(suggestedFeatures, formData.comments);
+          setAiSuggestionExplanation(explanation);
+          setShowAISuggestions(true);
+        }
+      } else {
+        showToast('info', 'No specific accessibility features detected in your comments');
+        setAiSuggestionExplanation('No specific accessibility features were detected in your comments. You can still manually select relevant features below.');
+        setShowAISuggestions(true);
+      }
+    } catch (error) {
+      console.error('ReviewPage: Error getting AI suggestions:', error);
+      showToast('error', 'Failed to get AI suggestions. Please try again.');
+    } finally {
+      setIsLoadingAISuggestions(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -269,8 +331,10 @@ export const ReviewPage: React.FC = () => {
         comments: '',
       });
 
-      // Reset uploaded photos
+      // Reset uploaded photos and AI suggestions
       setUploadedPhotos([]);
+      setShowAISuggestions(false);
+      setAiSuggestionExplanation('');
 
       // Clear the autocomplete input
       if (addressInputRef.current) {
@@ -455,6 +519,64 @@ export const ReviewPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Comments with AI Suggestions */}
+            <div>
+              <label htmlFor="comments" className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Comments
+              </label>
+              <textarea
+                id="comments"
+                name="comments"
+                value={formData.comments}
+                onChange={(e) => setFormData(prev => ({ ...prev, comments: e.target.value }))}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                placeholder="Share any additional details about accessibility features or barriers..."
+              />
+              
+              {/* AI Suggestion Button */}
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleAISuggestions}
+                  disabled={isLoadingAISuggestions || !formData.comments.trim()}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isLoadingAISuggestions || !formData.comments.trim()
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-sm hover:shadow-md'
+                  }`}
+                >
+                  {isLoadingAISuggestions ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isLoadingAISuggestions ? 'Analyzing...' : 'Suggest Features with AI'}
+                  </span>
+                </button>
+                
+                {formData.comments.trim() && formData.comments.trim().length < 10 && (
+                  <p className="text-xs text-gray-500">
+                    Write more details for better AI suggestions
+                  </p>
+                )}
+              </div>
+
+              {/* AI Suggestion Results */}
+              {showAISuggestions && aiSuggestionExplanation && (
+                <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-purple-900 mb-1">AI Analysis</p>
+                      <p className="text-sm text-purple-700">{aiSuggestionExplanation}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Accessibility Features */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Accessibility Features</h2>
@@ -499,22 +621,6 @@ export const ReviewPage: React.FC = () => {
                 userId={user.id}
                 maxPhotos={5}
                 disabled={isSubmitting}
-              />
-            </div>
-
-            {/* Comments */}
-            <div>
-              <label htmlFor="comments" className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Comments
-              </label>
-              <textarea
-                id="comments"
-                name="comments"
-                value={formData.comments}
-                onChange={(e) => setFormData(prev => ({ ...prev, comments: e.target.value }))}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                placeholder="Share any additional details about accessibility features or barriers..."
               />
             </div>
 

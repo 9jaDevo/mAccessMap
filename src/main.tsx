@@ -40,7 +40,6 @@ if ('serviceWorker' in navigator) {
       // Handle service worker controller change
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         console.log('Service worker controller changed');
-        window.location.reload();
       });
       
     } catch (error) {

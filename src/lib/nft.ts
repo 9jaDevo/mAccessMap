@@ -3,7 +3,7 @@ import { showToast } from '../components/Toaster';
 
 // Contract ABI for the NFT badge contract
 export const contractABI = [
-  	{
+	{
 		"inputs": [
 			{
 				"internalType": "address",
